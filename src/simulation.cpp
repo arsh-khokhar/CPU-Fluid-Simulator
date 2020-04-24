@@ -32,11 +32,6 @@ bool isLeftClicked = false;
 void fade();
 void renderFluid();
 
-// Model-view and projection matrices uniform location
-GLuint ModelView, ModelViewInverseTranspose, Projection;
-GLuint Time;
-GLboolean UseLighting;
-
 FluidCell* activeCell;
 FluidSimulator* activeSimulator;
 
@@ -45,7 +40,7 @@ FluidSimulator* activeSimulator;
 // OpenGL initialization
 void init() {
 	//create a new fluid cell
-	activeCell = new FluidCell(0.2f, 0.0f, 0.00001f);
+	activeCell = new FluidCell(0.2f, 0.01f, 0.000005f);
 	activeSimulator = new FluidSimulator(activeCell, 16);
 
 	// create the height field vertices (a 2D grid in the x-z plane)
@@ -57,10 +52,10 @@ void init() {
 		float y = i * dy - 1.0f;
 		for (int j = 0; j < N; j++) {
 			float x = j * dx - 1.0f;
-			vertices[Index++] = point4(x, y, 1.0, 1.0); //point4(x, y, (Index - 0.0f) / NumVertices, 1.0);
-			vertices[Index++] = point4(x + dx, y, 1.0, 1.0); //point4(x + dx, y, (Index - 1.0f) / NumVertices, 1.0);
-			vertices[Index++] = point4(x + dx, y + dy, 1.0, 1.0); //point4(x + dx, y + dy, (Index - 2.0f) / NumVertices, 1.0);
-			vertices[Index++] = point4(x, y + dy, 1.0, 1.0); //point4(x, y + dy, (Index - 3.0f) / NumVertices, 1.0);
+			vertices[Index++] = point4(x, y, 1.0, 1.0); 
+			vertices[Index++] = point4(x + dx, y, 1.0, 1.0); 
+			vertices[Index++] = point4(x + dx, y + dy, 1.0, 1.0); 
+			vertices[Index++] = point4(x, y + dy, 1.0, 1.0); 
 			indices[FaceIndex++] = Index - 4;
 			indices[FaceIndex++] = Index - 3;
 			indices[FaceIndex++] = Index - 1;
@@ -97,38 +92,6 @@ void init() {
 	glEnableVertexAttribArray(vPosition);
 	glVertexAttribPointer(vPosition, 4, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(0));
 
-	// Initialize shader lighting parameters
-	point4 light_position(0.0, 0.0, -1.0, 0.0);
-	color4 light_ambient(0.2, 0.2, 0.2, 1.0);
-	color4 light_diffuse(1.0, 1.0, 1.0, 1.0);
-	color4 light_specular(1.0, 1.0, 1.0, 1.0);
-
-	color4 material_ambient(0.0215, 0.1745, 0.0215, 1.0);
-	color4 material_diffuse(0.07568, 0.61424, 0.07568, 1.0);
-	color4 material_specular(0.633, 0.727811, 0.633, 1.0);
-	float  material_shininess = 60.0;
-
-	color4 ambient_product = light_ambient * material_ambient;
-	color4 diffuse_product = light_diffuse * material_diffuse;
-	color4 specular_product = light_specular * material_specular;
-
-	glUniform4fv(glGetUniformLocation(program, "AmbientProduct"), 1, glm::value_ptr(ambient_product));
-	glUniform4fv(glGetUniformLocation(program, "DiffuseProduct"), 1, glm::value_ptr(diffuse_product));
-	glUniform4fv(glGetUniformLocation(program, "SpecularProduct"), 1, glm::value_ptr(specular_product));
-
-	glUniform4fv(glGetUniformLocation(program, "LightPosition"), 1, glm::value_ptr(light_position));
-
-	glUniform1f(glGetUniformLocation(program, "Shininess"), material_shininess);
-
-	glUniform1f(glGetUniformLocation(program, "Distance"), 1.0f / N);
-
-	// Retrieve transformation uniform variable locations
-	ModelView = glGetUniformLocation(program, "ModelView");
-	ModelViewInverseTranspose = glGetUniformLocation(program, "ModelViewInverseTranspose");
-	Projection = glGetUniformLocation(program, "Projection");
-	Time = glGetUniformLocation(program, "Time");
-	UseLighting = glGetUniformLocation(program, "UseLighting");
-
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -140,23 +103,6 @@ void init() {
 
 void display(void) {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	//  Generate the model-view matrix
-	// TODO: Support the mdoel-view + lighting/materials
-	const glm::vec3 viewer_pos(0.0, 0.0, 1.2f);
-	const glm::vec3 model_trans(-0.0, 0.0, 0.0);
-	glm::mat4 trans, rot, model_view;
-	trans = glm::translate(trans, -viewer_pos);
-	model_view = trans;
-
-	long long ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-
-	glUniform1f(Time, (ms % 1000000) / 1000.0f);
-	glUniformMatrix4fv(ModelView, 1, GL_FALSE, glm::value_ptr(model_view));
-	glUniformMatrix4fv(ModelViewInverseTranspose, 1, GL_FALSE, glm::value_ptr(glm::transpose(glm::inverse(model_view))));
-
-	glUniform1f(UseLighting, true);
-	glScalef(2.0, 2.0, 1.0);
 	activeSimulator->step();
 	renderFluid();
 	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);
@@ -189,7 +135,6 @@ void mouse(int button, int state, int x, int y) {
 //----------------------------------------------------------------------------
 
 void update(void) {
-	// TO-DO: Add more features
 }
 
 //----------------------------------------------------------------------------
@@ -233,6 +178,7 @@ void renderFluid()
 		}
 	}
 }
+
 void fade()
 {
 	for (int i = 0; i < N; i++) {
@@ -244,9 +190,4 @@ void fade()
 //----------------------------------------------------------------------------
 
 void reshape(int width, int height) {
-	glViewport(0, 0, width, height);
-
-	GLfloat aspect = GLfloat(width) / height;
-	glm::mat4  projection = glm::ortho(glm::radians(45.0f), aspect, 0.5f, 3.0f);
-	glUniformMatrix4fv(Projection, 1, GL_FALSE, glm::value_ptr(projection));
 }
